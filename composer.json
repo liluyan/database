@@ -1,0 +1,21 @@
+{
+    "name": "godjarvis/database",
+    "description": "database tools from godjarvis",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "godjarvis",
+            "email": "2454280556@qq.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "php": "^7.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "GodJarvis\\Database\\": "src/"
+        }
+    }
+}
