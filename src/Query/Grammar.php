@@ -551,6 +551,10 @@ class Grammar
 
     public function wrap($value, $prefixAlias = false)
     {
+        if ($this->isExpression($value)) {
+            return $this->getValue($value);
+        }
+
         if (stripos($value, ' as ') !== false) {
             return $this->wrapAliasedValue($value, $prefixAlias);
         }
@@ -586,6 +590,16 @@ class Grammar
         return implode(' ', array_filter($segments, function ($value) {
             return (string)$value !== '';
         }));
+    }
+
+    public function isExpression($value)
+    {
+        return $value instanceof Expression;
+    }
+
+    public function getValue($expression)
+    {
+        return $expression->getValue();
     }
 
     protected function removeLeadingBoolean($value)
@@ -692,7 +706,7 @@ class Grammar
     {
         $keys = array_keys($values);
         $callback = function ($value, $key) {
-            return $this->wrap($key).' = '.$this->parameter($value);
+            return $this->wrap($key) . ' = ' . $this->parameter($value);
         };
         $items = array_map($callback, $values, $keys);
         return implode(', ', array_combine($keys, $items));
