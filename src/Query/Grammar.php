@@ -517,6 +517,11 @@ class Grammar
         return "update {$table} {$joins} set {$columns} {$where}";
     }
 
+    protected function compileUpdateWithoutJoins(Builder $query, $table, $columns, $where)
+    {
+        return "update {$table} set {$columns} {$where}";
+    }
+
     public function prepareBindingsForDelete(array $bindings)
     {
         unset($bindings['select']);
@@ -666,5 +671,30 @@ class Grammar
         $this->tablePrefix = $prefix;
 
         return $this;
+    }
+
+    public function compileUpdate(Builder $query, array $values)
+    {
+        $table = $this->wrapTable($query->from);
+
+        $columns = $this->compileUpdateColumns($query, $values);
+
+        $where = $this->compileWheres($query);
+
+        return trim(
+            isset($query->joins)
+                ? $this->compileUpdateWithJoins($query, $table, $columns, $where)
+                : $this->compileUpdateWithoutJoins($query, $table, $columns, $where)
+        );
+    }
+
+    protected function compileUpdateColumns(Builder $query, array $values)
+    {
+        $keys = array_keys($values);
+        $callback = function ($value, $key) {
+            return $this->wrap($key).' = '.$this->parameter($value);
+        };
+        $items = array_map($callback, $values, $keys);
+        return implode(', ', array_combine($keys, $items));
     }
 }

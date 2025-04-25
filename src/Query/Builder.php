@@ -7,6 +7,12 @@ use InvalidArgumentException;
 
 class Builder
 {
+    public $sql = '';
+
+    public $operate = 'select';
+
+    public $updateOrInsertValues = [];
+
     public $grammar;
 
     public $bindings = [
@@ -123,12 +129,10 @@ class Builder
             $first($join);
 
             $this->joins[] = $join;
-
         } else {
             $method = $where ? 'where' : 'on';
 
             $this->joins[] = $join->$method($first, $operator, $second);
-
         }
         $this->addBinding($join->getBindings(), 'join');
 
@@ -411,12 +415,51 @@ class Builder
 
     public function toSql()
     {
-        return $this->grammar->compileSelect($this);
+        switch (true) {
+            case 'select' === $this->operate:
+                $this->sql = $this->grammar->compileSelect($this);
+                break;
+            case 'update' === $this->operate:
+                $this->sql = $this->grammar->compileUpdate($this, $this->updateOrInsertValues);
+                break;
+        }
+        return $this->sql;
+    }
+
+    public function getBindings()
+    {
+        $bindValues = [];
+        switch (true) {
+            case 'select' === $this->operate:
+                $bindValues = self::flatten($this->bindings);
+                break;
+            case 'update' === $this->operate:
+                $bindValues = $this->prepareBindingsForUpdate($this->bindings, $this->updateOrInsertValues);
+                break;
+        }
+        return $bindValues;
+    }
+
+    public function update(array $values)
+    {
+        $this->operate = 'update';
+        $this->updateOrInsertValues = $values;
+        return $this;
+    }
+
+    public function prepareBindingsForUpdate(array $bindings, array $values)
+    {
+        $cleanBindings = $bindings;
+        unset($cleanBindings['select'], $cleanBindings['join']);
+
+        return array_values(
+            array_merge($bindings['join'], $values, self::flatten($cleanBindings))
+        );
     }
 
     public function toFullSql()
     {
-        $sql = $this->grammar->compileSelect($this);
+        $sql = $this->sql;
         foreach ($this->getBindings() as $key => $value) {
             $position = strpos($sql, '?');
             if ($position !== false) {
@@ -424,11 +467,6 @@ class Builder
             }
         }
         return $sql;
-    }
-
-    public function getBindings()
-    {
-        return self::flatten($this->bindings);
     }
 
     public function addBinding($value, $type = 'where')
