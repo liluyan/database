@@ -422,6 +422,9 @@ class Builder
             case 'update' === $this->operate:
                 $this->sql = $this->grammar->compileUpdate($this, $this->updateOrInsertValues);
                 break;
+            case 'insert' === $this->operate:
+                $this->sql = $this->grammar->compileInsert($this, $this->updateOrInsertValues);
+                break;
         }
         return $this->sql;
     }
@@ -435,6 +438,9 @@ class Builder
                 break;
             case 'update' === $this->operate:
                 $bindValues = $this->prepareBindingsForUpdate($this->bindings, $this->updateOrInsertValues);
+                break;
+            case 'insert' === $this->operate:
+                $bindValues = $this->prepareBindingsForInsert($this->updateOrInsertValues);
                 break;
         }
         return $bindValues;
@@ -455,6 +461,27 @@ class Builder
         return array_values(
             array_merge($bindings['join'], $values, self::flatten($cleanBindings))
         );
+    }
+
+    public function insert(array $values)
+    {
+        if (!is_array(reset($values))) {
+            $values = [$values];
+        } else {
+            foreach ($values as $key => $value) {
+                ksort($value);
+                $values[$key] = $value;
+            }
+        }
+
+        $this->operate = 'insert';
+        $this->updateOrInsertValues = $values;
+        return $this;
+    }
+
+    public function prepareBindingsForInsert(array $values)
+    {
+        return self::flatten($values, 1);
     }
 
     public function toFullSql()
