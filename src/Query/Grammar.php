@@ -162,7 +162,7 @@ class Grammar
             $column = 'distinct ' . $column;
         }
 
-        return 'select ' . $aggregate['function'] . '(' . $column . ') as aggregate';
+        return 'select ' . $aggregate['function'] . '(' . $column . ') as ' . $aggregate['asAlias'];
     }
 
     protected function compileColumns(Builder $query, $columns)

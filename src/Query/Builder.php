@@ -563,11 +563,11 @@ class Builder
         return $this;
     }
 
-    public function aggregate($function, $columns = ['*'])
+    public function aggregate($function, $columns = ['*'], $asAlias = 'aggregate')
     {
         return $this->cloneWithout($this->unions || $this->havings ? [] : ['columns'])
             ->cloneWithoutBindings($this->unions || $this->havings ? [] : ['select'])
-            ->setAggregate($function, $columns);
+            ->setAggregate($function, $columns, $asAlias);
     }
 
     public function cloneWithout(array $properties)
@@ -595,9 +595,9 @@ class Builder
         return $clone;
     }
 
-    protected function setAggregate($function, $columns)
+    protected function setAggregate($function, $columns, $asAlias)
     {
-        $this->aggregate = compact('function', 'columns');
+        $this->aggregate = compact('function', 'columns', 'asAlias');
 
         if (empty($this->groups)) {
             $this->orders = null;
@@ -608,30 +608,28 @@ class Builder
         return $this;
     }
 
-    public function count($columns = '*')
+    public function count($columns = '*', $asAlias = 'aggregate')
     {
-        return $this->aggregate(__FUNCTION__, (array)$columns);
+        return $this->aggregate(__FUNCTION__, (array)$columns, $asAlias);
     }
 
-    public function min($column)
+    public function min($column, $asAlias = 'aggregate')
     {
-        return $this->aggregate(__FUNCTION__, [$column]);
+        return $this->aggregate(__FUNCTION__, [$column], $asAlias);
     }
 
-    public function max($column)
+    public function max($column, $asAlias = 'aggregate')
     {
-        return $this->aggregate(__FUNCTION__, [$column]);
+        return $this->aggregate(__FUNCTION__, [$column], $asAlias);
     }
 
-    public function sum($column)
+    public function sum($column, $asAlias = 'aggregate')
     {
-        $result = $this->aggregate(__FUNCTION__, [$column]);
-
-        return $result ?: 0;
+        return $this->aggregate(__FUNCTION__, [$column], $asAlias);
     }
 
-    public function avg($column)
+    public function avg($column, $asAlias = 'aggregate')
     {
-        return $this->aggregate(__FUNCTION__, [$column]);
+        return $this->aggregate(__FUNCTION__, [$column], $asAlias);
     }
 }
