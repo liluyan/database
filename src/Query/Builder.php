@@ -562,4 +562,76 @@ class Builder
 
         return $this;
     }
+
+    public function aggregate($function, $columns = ['*'])
+    {
+        return $this->cloneWithout($this->unions || $this->havings ? [] : ['columns'])
+            ->cloneWithoutBindings($this->unions || $this->havings ? [] : ['select'])
+            ->setAggregate($function, $columns);
+    }
+
+    public function cloneWithout(array $properties)
+    {
+        (function ($clone) use ($properties) {
+            foreach ($properties as $property) {
+                $clone->{$property} = null;
+            }
+        })($clone = $this->clone());
+        return $clone;
+    }
+
+    public function clone()
+    {
+        return clone $this;
+    }
+
+    public function cloneWithoutBindings(array $except)
+    {
+        (function ($clone) use ($except) {
+            foreach ($except as $type) {
+                $clone->bindings[$type] = [];
+            }
+        })($clone = $this->clone());
+        return $clone;
+    }
+
+    protected function setAggregate($function, $columns)
+    {
+        $this->aggregate = compact('function', 'columns');
+
+        if (empty($this->groups)) {
+            $this->orders = null;
+
+            $this->bindings['order'] = [];
+        }
+
+        return $this;
+    }
+
+    public function count($columns = '*')
+    {
+        return $this->aggregate(__FUNCTION__, (array)$columns);
+    }
+
+    public function min($column)
+    {
+        return $this->aggregate(__FUNCTION__, [$column]);
+    }
+
+    public function max($column)
+    {
+        return $this->aggregate(__FUNCTION__, [$column]);
+    }
+
+    public function sum($column)
+    {
+        $result = $this->aggregate(__FUNCTION__, [$column]);
+
+        return $result ?: 0;
+    }
+
+    public function avg($column)
+    {
+        return $this->aggregate(__FUNCTION__, [$column]);
+    }
 }
