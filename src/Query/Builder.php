@@ -250,6 +250,20 @@ class Builder
         return $this->where($column, $operator, $value, 'or');
     }
 
+    public function whereRaw($sql, $bindings = [], $boolean = 'and')
+    {
+        $this->wheres[] = ['type' => 'raw', 'sql' => $sql, 'boolean' => $boolean];
+
+        $this->addBinding((array)$bindings);
+
+        return $this;
+    }
+
+    public function orWhereRaw($sql, $bindings = [])
+    {
+        return $this->whereRaw($sql, $bindings, 'or');
+    }
+
     public function whereIn($column, $values, $boolean = 'and', $not = false)
     {
         $type = $not ? 'NotIn' : 'In';
