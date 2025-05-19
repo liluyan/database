@@ -105,6 +105,46 @@ class Grammar
         return "insert into $table ($columns) values $parameters";
     }
 
+    public function compileInsertOrIgnore(Builder $query, array $values)
+    {
+        $search = 'insert';
+        $replace = 'insert ignore';
+        $subject = $this->compileInsert($query, $values);
+        $position = strpos($subject, $search);
+        if ($position !== false) {
+            return substr_replace($subject, $replace, $position, strlen($search));
+        }
+        return $subject;
+    }
+
+    public function compileDelete(Builder $query)
+    {
+        $table = $this->wrapTable($query->from);
+
+        $where = $this->compileWheres($query);
+
+        return trim(
+            isset($query->joins)
+                ? $this->compileDeleteWithJoins($query, $table, $where)
+                : $this->compileDeleteWithoutJoins($query, $table, $where)
+        );
+    }
+
+    protected function compileDeleteWithJoins(Builder $query, $table, $where)
+    {
+        $explodeTable = explode(' as ', $table);
+        $alias = end($explodeTable);
+
+        $joins = $this->compileJoins($query, $query->joins);
+
+        return "delete {$alias} from {$table} {$joins} {$where}";
+    }
+
+    protected function compileDeleteWithoutJoins(Builder $query, $table, $where)
+    {
+        return "delete from {$table} {$where}";
+    }
+
     protected function wrapValue($value)
     {
         return $value === '*' ? $value : '`' . str_replace('`', '``', $value) . '`';

@@ -439,6 +439,12 @@ class Builder
             case 'insert' === $this->operate:
                 $this->sql = $this->grammar->compileInsert($this, $this->updateOrInsertValues);
                 break;
+            case 'insertOrIgnore' === $this->operate:
+                $this->sql = $this->grammar->compileInsertOrIgnore($this, $this->updateOrInsertValues);
+                break;
+            case 'delete' === $this->operate:
+                $this->sql = $this->grammar->compileDelete($this);
+                break;
         }
         return $this->sql;
     }
@@ -454,7 +460,11 @@ class Builder
                 $bindValues = $this->prepareBindingsForUpdate($this->bindings, $this->updateOrInsertValues);
                 break;
             case 'insert' === $this->operate:
+            case 'insertOrIgnore' === $this->operate:
                 $bindValues = $this->prepareBindingsForInsert($this->updateOrInsertValues);
+                break;
+            case 'delete' === $this->operate:
+                $bindValues = $this->prepareBindingsForDelete($this->updateOrInsertValues);
                 break;
         }
         return $bindValues;
@@ -477,6 +487,14 @@ class Builder
         );
     }
 
+    public function prepareBindingsForDelete(array $bindings)
+    {
+        $cleanBindings = $bindings;
+        unset($cleanBindings['select']);
+
+        return self::flatten($cleanBindings);
+    }
+
     public function insert(array $values)
     {
         if (!is_array(reset($values))) {
@@ -490,6 +508,32 @@ class Builder
 
         $this->operate = 'insert';
         $this->updateOrInsertValues = $values;
+        return $this;
+    }
+
+    public function insertOrIgnore(array $values)
+    {
+        if (!is_array(reset($values))) {
+            $values = [$values];
+        } else {
+            foreach ($values as $key => $value) {
+                ksort($value);
+                $values[$key] = $value;
+            }
+        }
+
+        $this->operate = 'insertOrIgnore';
+        $this->updateOrInsertValues = $values;
+        return $this;
+    }
+
+    public function delete($id = null)
+    {
+        if (!is_null($id)) {
+            $this->where($this->from . '.id', '=', $id);
+        }
+
+        $this->operate = 'delete';
         return $this;
     }
 
