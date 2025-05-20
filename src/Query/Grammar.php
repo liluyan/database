@@ -751,4 +751,20 @@ class Grammar
         $items = array_map($callback, $values, $keys);
         return implode(', ', array_combine($keys, $items));
     }
+
+    public function compileUpsert(Builder $query, array $values, array $uniqueBy, array $update)
+    {
+        $sql = $this->compileInsert($query, $values) . ' on duplicate key update ';
+
+        $keys = array_keys($update);
+        $callback = function ($value, $key) {
+            return is_numeric($key)
+                ? $this->wrap($value) . ' = values(' . $this->wrap($value) . ')'
+                : $this->wrap($key) . ' = ' . $this->parameter($value);
+        };
+        $items = array_map($callback, $values, $keys);
+        $columns = implode(', ', array_combine($keys, $items));
+
+        return $sql . $columns;
+    }
 }

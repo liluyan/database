@@ -13,6 +13,12 @@ class Builder
 
     public $updateOrInsertValues = [];
 
+    public $upsertValues = [
+        'insert' => [],
+        'unique_by' => [],
+        'update' => []
+    ];
+
     public $grammar;
 
     public $bindings = [
@@ -442,6 +448,9 @@ class Builder
             case 'insertOrIgnore' === $this->operate:
                 $this->sql = $this->grammar->compileInsertOrIgnore($this, $this->updateOrInsertValues);
                 break;
+            case 'upsert' === $this->operate:
+                $this->sql = $this->grammar->compileUpsert($this, $this->upsertValues['insert'], (array)$this->upsertValues['unique_by'], $this->upsertValues['update']);
+                break;
             case 'delete' === $this->operate:
                 $this->sql = $this->grammar->compileDelete($this);
                 break;
@@ -463,6 +472,9 @@ class Builder
             case 'insertOrIgnore' === $this->operate:
                 $bindValues = $this->prepareBindingsForInsert($this->updateOrInsertValues);
                 break;
+            case 'upsert' === $this->operate:
+                $bindValues = $this->prepareBindingsForUpsert($this->upsertValues['insert'], $this->upsertValues['update']);
+                break;
             case 'delete' === $this->operate:
                 $bindValues = $this->prepareBindingsForDelete($this->updateOrInsertValues);
                 break;
@@ -474,6 +486,32 @@ class Builder
     {
         $this->operate = 'update';
         $this->updateOrInsertValues = $values;
+        return $this;
+    }
+
+    public function upsert(array $values, $uniqueBy, $update = null)
+    {
+        if ($update === []) {
+            return $this->insert($values);
+        }
+
+        $this->operate = 'upsert';
+        $this->upsertValues['unique_by'] = $uniqueBy;
+        if (!is_array(reset($values))) {
+            $values = [$values];
+        } else {
+            foreach ($values as $key => $value) {
+                ksort($value);
+
+                $values[$key] = $value;
+            }
+        }
+        $this->upsertValues['insert'] = $values;
+
+        if (is_null($update)) {
+            $update = array_keys(reset($values));
+            $this->upsertValues['update'] = $update;
+        }
         return $this;
     }
 
@@ -540,6 +578,16 @@ class Builder
     public function prepareBindingsForInsert(array $values)
     {
         return self::flatten($values, 1);
+    }
+
+    public function prepareBindingsForUpsert(array $values, array $update)
+    {
+        return array_merge(
+            self::flatten($values, 1),
+            array_filter($update, function ($value, $key) {
+                return !is_int($key);
+            }, ARRAY_FILTER_USE_BOTH)
+        );
     }
 
     public function toFullSql()
