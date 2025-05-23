@@ -19,6 +19,11 @@ class Builder
         'update' => []
     ];
 
+    public $batchUpdateValues = [
+        'values' => [],
+        'index' => 'id',
+    ];
+
     public $grammar;
 
     public $bindings = [
@@ -442,6 +447,9 @@ class Builder
             case 'update' === $this->operate:
                 $this->sql = $this->grammar->compileUpdate($this, $this->updateOrInsertValues);
                 break;
+            case 'batchUpdate' === $this->operate:
+                $this->sql = $this->grammar->compileBatchUpdate($this, $this->batchUpdateValues['values'], $this->batchUpdateValues['index']);
+                break;
             case 'insert' === $this->operate:
                 $this->sql = $this->grammar->compileInsert($this, $this->updateOrInsertValues);
                 break;
@@ -468,6 +476,9 @@ class Builder
             case 'update' === $this->operate:
                 $bindValues = $this->prepareBindingsForUpdate($this->bindings, $this->updateOrInsertValues);
                 break;
+            case 'batchUpdate' === $this->operate:
+                $bindValues = $this->prepareBindingsForBatchUpdate($this->bindings, $this->batchUpdateValues['values'], $this->batchUpdateValues['index']);
+                break;
             case 'insert' === $this->operate:
             case 'insertOrIgnore' === $this->operate:
                 $bindValues = $this->prepareBindingsForInsert($this->updateOrInsertValues);
@@ -486,6 +497,23 @@ class Builder
     {
         $this->operate = 'update';
         $this->updateOrInsertValues = $values;
+        return $this;
+    }
+
+    public function batchUpdate(array $values, string $index)
+    {
+        if (!is_array(reset($values))) {
+            $values = [$values];
+        } else {
+            foreach ($values as $key => $value) {
+                ksort($value);
+                $values[$key] = $value;
+            }
+        }
+        $this->whereIn($index, array_column($values, $index));
+        $this->operate = 'batchUpdate';
+        $this->batchUpdateValues['values'] = $values;
+        $this->batchUpdateValues['index'] = $index;
         return $this;
     }
 
@@ -519,6 +547,27 @@ class Builder
     {
         $cleanBindings = $bindings;
         unset($cleanBindings['select'], $cleanBindings['join']);
+
+        return array_values(
+            array_merge($bindings['join'], $values, self::flatten($cleanBindings))
+        );
+    }
+
+    public function prepareBindingsForBatchUpdate(array $bindings, array $values, string $index)
+    {
+        $cleanBindings = $bindings;
+        unset($cleanBindings['select'], $cleanBindings['join']);
+
+        $caseValues = [];
+        foreach ($values as $record) {
+            foreach (array_keys($record) as $field) {
+                if ($field === $index) {
+                    continue;
+                }
+                $caseValues[$field][] = [$record[$index], $record[$field]];
+            }
+        }
+        $values = self::flatten($caseValues);
 
         return array_values(
             array_merge($bindings['join'], $values, self::flatten($cleanBindings))

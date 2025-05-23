@@ -742,6 +742,17 @@ class Grammar
         );
     }
 
+    public function compileBatchUpdate(Builder $query, array $values, string $index)
+    {
+        $table = $this->wrapTable($query->from);
+
+        $columns = $this->compileBatchUpdateColumns($query, $values, $index);
+
+        $where = $this->compileWheres($query);
+
+        return $this->compileUpdateWithoutJoins($query, $table, $columns, $where);
+    }
+
     protected function compileUpdateColumns(Builder $query, array $values)
     {
         $keys = array_keys($values);
@@ -749,6 +760,26 @@ class Grammar
             return $this->wrap($key) . ' = ' . $this->parameter($value);
         };
         $items = array_map($callback, $values, $keys);
+        return implode(', ', array_combine($keys, $items));
+    }
+
+    protected function compileBatchUpdateColumns(Builder $query, array $values, string $index)
+    {
+        $columnCases = [];
+        foreach ($values as $record) {
+            foreach (array_keys($record) as $field) {
+                if ($field === $index) {
+                    continue;
+                }
+                $columnCases[$field][] = 'when ' . $this->wrap($index) . ' = ' . $this->parameter($record[$index]) . ' then ' . $this->parameter($record[$field]);
+            }
+        }
+
+        $keys = array_keys($columnCases);
+        $callback = function ($value, $key) {
+            return $this->wrap($key) . ' = ' . '(case ' . implode("\n", $value) . ' else ' . $this->wrap($key) . ' end)';
+        };
+        $items = array_map($callback, $columnCases, $keys);
         return implode(', ', array_combine($keys, $items));
     }
 
