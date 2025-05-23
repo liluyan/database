@@ -538,8 +538,8 @@ class Builder
 
         if (is_null($update)) {
             $update = array_keys(reset($values));
-            $this->upsertValues['update'] = $update;
         }
+        $this->upsertValues['update'] = $update;
         return $this;
     }
 

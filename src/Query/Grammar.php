@@ -793,7 +793,7 @@ class Grammar
                 ? $this->wrap($value) . ' = values(' . $this->wrap($value) . ')'
                 : $this->wrap($key) . ' = ' . $this->parameter($value);
         };
-        $items = array_map($callback, $values, $keys);
+        $items = array_map($callback, $update, $keys);
         $columns = implode(', ', array_combine($keys, $items));
 
         return $sql . $columns;
