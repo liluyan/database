@@ -438,6 +438,29 @@ class Builder
         return $this->offset(($page - 1) * $perPage)->limit($perPage);
     }
 
+    public function union($query, $all = false)
+    {
+        if ($query instanceof Closure) {
+            $query($query = $this->newQuery());
+        }
+
+        $this->unions[] = compact('query', 'all');
+
+        $this->addBinding($query->getBindings(), 'union');
+
+        return $this;
+    }
+
+    public function unionAll($query)
+    {
+        return $this->union($query, true);
+    }
+
+    public function newQuery()
+    {
+        return new static();
+    }
+
     public function toSql()
     {
         switch (true) {
