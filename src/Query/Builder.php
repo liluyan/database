@@ -150,6 +150,17 @@ class Builder
         return $this;
     }
 
+    public function joinSub($query, $as, $first, $operator = null, $second = null, $type = 'inner', $where = false)
+    {
+        [$query, $bindings] = $this->createSub($query);
+
+        $expression = '(' . $query . ') as ' . $this->grammar->wrapTable($as);
+
+        $this->addBinding($bindings, 'join');
+
+        return $this->join(new Expression($expression), $first, $operator, $second, $type, $where);
+    }
+
     public function on($first, $operator = null, $second = null, $boolean = 'and')
     {
         return $this->whereColumn($first, $operator, $second, $boolean);
@@ -160,9 +171,19 @@ class Builder
         return $this->join($table, $first, $operator, $second, 'left');
     }
 
+    public function leftJoinSub($query, $as, $first, $operator = null, $second = null)
+    {
+        return $this->joinSub($query, $as, $first, $operator, $second, 'left');
+    }
+
     public function rightJoin($table, $first, $operator = null, $second = null)
     {
         return $this->join($table, $first, $operator, $second, 'right');
+    }
+
+    public function rightJoinSub($query, $as, $first, $operator = null, $second = null)
+    {
+        return $this->joinSub($query, $as, $first, $operator, $second, 'right');
     }
 
     public function where($column, $operator = null, $value = null, $boolean = 'and')
@@ -728,6 +749,37 @@ class Builder
         }
 
         return $this;
+    }
+
+    protected function createSub($query)
+    {
+        if ($query instanceof Closure) {
+            $callback = $query;
+
+            $callback($query = $this->forSubQuery());
+        }
+
+        return $this->parseSub($query);
+    }
+
+    protected function forSubQuery()
+    {
+        return $this->newQuery();
+    }
+
+    protected function parseSub($query)
+    {
+        if ($query instanceof self) {
+            return [$query->toSql(), $query->getBindings()];
+        }
+
+        if (is_string($query)) {
+            return [$query, []];
+        }
+
+        throw new InvalidArgumentException(
+            'A subquery must be a query builder instance, a Closure, or a string.'
+        );
     }
 
     public function addSelect($column)
