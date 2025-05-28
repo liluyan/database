@@ -664,7 +664,11 @@ class Grammar
 
     public function wrapTable($table)
     {
-        return $this->wrap($this->tablePrefix . $table, true);
+        if (!$this->isExpression($table)) {
+            return $this->wrap($this->tablePrefix . $table, true);
+        }
+
+        return $this->getValue($table);
     }
 
     protected function wrapAliasedValue($value, $prefixAlias = false)
@@ -703,7 +707,7 @@ class Grammar
 
     public function parameter($value)
     {
-        return '?';
+        return $this->isExpression($value) ? $this->getValue($value) : '?';
     }
 
     public function quoteString($value)
@@ -742,15 +746,21 @@ class Grammar
         );
     }
 
-    public function compileBatchUpdate(Builder $query, array $values, string $index)
+    public function compileBatchUpdate(Builder $query, array $values, string $index, bool $updateWithJoin = false)
     {
         $table = $this->wrapTable($query->from);
 
-        $columns = $this->compileBatchUpdateColumns($query, $values, $index);
+        $columns = $updateWithJoin
+            ? $this->compileBatchUpdateWithJoinColumns($query, $values, $index)
+            : $this->compileBatchUpdateColumns($query, $values, $index);
 
         $where = $this->compileWheres($query);
 
-        return $this->compileUpdateWithoutJoins($query, $table, $columns, $where);
+        return trim(
+            isset($query->joins)
+                ? $this->compileUpdateWithJoins($query, $table, $columns, $where)
+                : $this->compileUpdateWithoutJoins($query, $table, $columns, $where)
+        );
     }
 
     protected function compileUpdateColumns(Builder $query, array $values)
@@ -780,6 +790,39 @@ class Grammar
             return $this->wrap($key) . ' = ' . '(case ' . implode("\n", $value) . ' else ' . $this->wrap($key) . ' end)';
         };
         $items = array_map($callback, $columnCases, $keys);
+        return implode(', ', array_combine($keys, $items));
+    }
+
+    public function compileBatchUpdateWithJoinColumns(Builder $query, array $values, string $index)
+    {
+        $baseQuery = null;
+        foreach ($values as $record) {
+            $subQuery = $query->newQuery();
+            $subQuery->selectRaw($this->compileBatchUpdateUnionColumns($subQuery, $record), array_values($record));
+            if (null === $baseQuery) {
+                $baseQuery = $subQuery;
+            } else {
+                $baseQuery->unionAll($subQuery);
+            }
+        }
+        $query->joinSub($baseQuery, $as = 'updates', $query->from . '.' . $index, '=', $as . '.' . $index);
+
+        $updateColumns = array_diff(array_keys($values[0]), [$index]);
+        $fromTable = $query->from;
+        $callback = function ($value) use ($fromTable, $as) {
+            return $this->wrap($fromTable) . '.' . $this->wrap($value) . ' = ' . $this->wrap($as) . '.' . $this->wrap($value);
+        };
+        $items = array_map($callback, $updateColumns);
+        return implode(', ', $items);
+    }
+
+    public function compileBatchUpdateUnionColumns(Builder $query, array $values)
+    {
+        $keys = array_keys($values);
+        $callback = function ($value, $key) {
+            return $this->parameter($value) . ' as ' . $this->wrap($key);
+        };
+        $items = array_map($callback, $values, $keys);
         return implode(', ', array_combine($keys, $items));
     }
 

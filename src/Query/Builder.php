@@ -22,6 +22,7 @@ class Builder
     public $batchUpdateValues = [
         'values' => [],
         'index' => 'id',
+        'updateWithJoin' => false,
     ];
 
     public $grammar;
@@ -492,7 +493,7 @@ class Builder
                 $this->sql = $this->grammar->compileUpdate($this, $this->updateOrInsertValues);
                 break;
             case 'batchUpdate' === $this->operate:
-                $this->sql = $this->grammar->compileBatchUpdate($this, $this->batchUpdateValues['values'], $this->batchUpdateValues['index']);
+                $this->sql = $this->grammar->compileBatchUpdate($this, $this->batchUpdateValues['values'], $this->batchUpdateValues['index'], $this->batchUpdateValues['updateWithJoin']);
                 break;
             case 'insert' === $this->operate:
                 $this->sql = $this->grammar->compileInsert($this, $this->updateOrInsertValues);
@@ -521,7 +522,7 @@ class Builder
                 $bindValues = $this->prepareBindingsForUpdate($this->bindings, $this->updateOrInsertValues);
                 break;
             case 'batchUpdate' === $this->operate:
-                $bindValues = $this->prepareBindingsForBatchUpdate($this->bindings, $this->batchUpdateValues['values'], $this->batchUpdateValues['index']);
+                $bindValues = $this->prepareBindingsForBatchUpdate($this->bindings, $this->batchUpdateValues['values'], $this->batchUpdateValues['index'], $this->batchUpdateValues['updateWithJoin']);
                 break;
             case 'insert' === $this->operate:
             case 'insertOrIgnore' === $this->operate:
@@ -544,7 +545,7 @@ class Builder
         return $this;
     }
 
-    public function batchUpdate(array $values, string $index)
+    public function batchUpdate(array $values, string $index, bool $updateWithJoin = false)
     {
         if (!is_array(reset($values))) {
             $values = [$values];
@@ -558,6 +559,7 @@ class Builder
         $this->operate = 'batchUpdate';
         $this->batchUpdateValues['values'] = $values;
         $this->batchUpdateValues['index'] = $index;
+        $this->batchUpdateValues['updateWithJoin'] = $updateWithJoin;
         return $this;
     }
 
@@ -597,7 +599,14 @@ class Builder
         );
     }
 
-    public function prepareBindingsForBatchUpdate(array $bindings, array $values, string $index)
+    public function prepareBindingsForBatchUpdate(array $bindings, array $values, string $index, bool $updateWithJoin = false)
+    {
+        return $updateWithJoin
+            ? $this->prepareBindingsForBatchUpdateWithJoin($bindings, $values)
+            : $this->prepareBindingsForBatchUpdateWithCaseWhen($bindings, $values, $index);
+    }
+
+    public function prepareBindingsForBatchUpdateWithCaseWhen(array $bindings, array $values, string $index)
     {
         $cleanBindings = $bindings;
         unset($cleanBindings['select'], $cleanBindings['join']);
@@ -615,6 +624,16 @@ class Builder
 
         return array_values(
             array_merge($bindings['join'], $values, self::flatten($cleanBindings))
+        );
+    }
+
+    public function prepareBindingsForBatchUpdateWithJoin(array $bindings, array $values)
+    {
+        $cleanBindings = $bindings;
+        unset($cleanBindings['select'], $cleanBindings['join']);
+
+        return array_values(
+            array_merge($bindings['join'], self::flatten($cleanBindings))
         );
     }
 
