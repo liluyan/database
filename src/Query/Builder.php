@@ -189,6 +189,10 @@ class Builder
 
     public function where($column, $operator = null, $value = null, $boolean = 'and')
     {
+        if (is_array($column)) {
+            return $this->addArrayOfWheres($column, $boolean);
+        }
+
         [$value, $operator] = $this->prepareValueAndOperator(
             $value,
             $operator,
@@ -220,6 +224,49 @@ class Builder
         $this->addBinding($value);
 
         return $this;
+    }
+
+    protected function addArrayOfWheres($column, $boolean, $method = 'where')
+    {
+        return $this->whereNested(function ($query) use ($column, $method, $boolean) {
+            foreach ($column as $key => $value) {
+                if (is_numeric($key) && is_array($value)) {
+                    $query->{$method}(...array_values($value));
+                } else {
+                    $query->$method($key, '=', $value, $boolean);
+                }
+            }
+        }, $boolean);
+    }
+
+    public function whereNested(Closure $callback, $boolean = 'and')
+    {
+        $callback($query = $this->forNestedWhere());
+
+        return $this->addNestedWhereQuery($query, $boolean);
+    }
+
+    public function forNestedWhere()
+    {
+        return $this->newQuery()->from($this->from);
+    }
+
+    public function addNestedWhereQuery(Builder $query, $boolean = 'and')
+    {
+        if (count($query->wheres)) {
+            $type = 'Nested';
+
+            $this->wheres[] = compact('type', 'query', 'boolean');
+
+            $this->addBinding($query->getRawBindings()['where']);
+        }
+
+        return $this;
+    }
+
+    public function getRawBindings()
+    {
+        return $this->bindings;
     }
 
     public function whereColumn($first, $operator = null, $second = null, $boolean = 'and')
