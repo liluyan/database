@@ -559,7 +559,17 @@ class Grammar
 
     protected function compileUpdateWithoutJoins(Builder $query, $table, $columns, $where)
     {
-        return "update {$table} set {$columns} {$where}";
+        $sql = "update {$table} set {$columns} {$where}";
+
+        if (!empty($query->orders)) {
+            $sql .= ' ' . $this->compileOrders($query, $query->orders);
+        }
+
+        if (isset($query->limit)) {
+            $sql .= ' ' . $this->compileLimit($query, $query->limit);
+        }
+
+        return $sql;
     }
 
     public function prepareBindingsForDelete(array $bindings)
