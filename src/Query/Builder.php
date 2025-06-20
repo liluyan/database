@@ -2,9 +2,6 @@
 
 namespace GodJarvis\Database\Query;
 
-use Closure;
-use InvalidArgumentException;
-
 class Builder
 {
     public $sql = '';
@@ -120,10 +117,28 @@ class Builder
 
     public function select($columns = ['*'])
     {
+        $this->columns = [];
         $this->bindings['select'] = [];
-        $this->columns = $columns;
+        $columns = is_array($columns) ? $columns : func_get_args();
+
+        foreach ($columns as $as => $column) {
+            if (is_string($as) && $this->isQueryable($column)) {
+                $this->selectSub($column, $as);
+            } else {
+                $this->columns[] = $column;
+            }
+        }
 
         return $this;
+    }
+
+    public function selectSub($query, $as)
+    {
+        [$query, $bindings] = $this->createSub($query);
+
+        return $this->selectRaw(
+            '(' . $query . ') as ' . $this->grammar->wrap($as), $bindings
+        );
     }
 
     public function from($table, $as = null)
@@ -137,7 +152,7 @@ class Builder
     {
         $join = $this->newJoinClause($this, $type, $table);
 
-        if ($first instanceof Closure) {
+        if ($first instanceof \Closure) {
             $first($join);
 
             $this->joins[] = $join;
@@ -199,7 +214,7 @@ class Builder
             func_num_args() === 2
         );
 
-        if ($column instanceof Closure && is_null($operator)) {
+        if ($column instanceof \Closure && is_null($operator)) {
             return $this->whereNested($column, $boolean);
         }
 
@@ -214,7 +229,7 @@ class Builder
             [$value, $operator] = [$operator, '='];
         }
 
-        if ($value instanceof Closure) {
+        if ($value instanceof \Closure) {
             return $this->whereSub($column, $operator, $value, $boolean);
         }
 
@@ -264,7 +279,7 @@ class Builder
         }, $boolean);
     }
 
-    public function whereNested(Closure $callback, $boolean = 'and')
+    public function whereNested(\Closure $callback, $boolean = 'and')
     {
         $callback($query = $this->forNestedWhere());
 
@@ -289,7 +304,7 @@ class Builder
         return $this;
     }
 
-    protected function whereSub($column, $operator, Closure $callback, $boolean)
+    protected function whereSub($column, $operator, \Closure $callback, $boolean)
     {
         $type = 'Sub';
 
@@ -304,7 +319,7 @@ class Builder
         return $this;
     }
 
-    public function whereExists(Closure $callback, $boolean = 'and', $not = false)
+    public function whereExists(\Closure $callback, $boolean = 'and', $not = false)
     {
         $query = $this->forSubQuery();
 
@@ -313,17 +328,17 @@ class Builder
         return $this->addWhereExistsQuery($query, $boolean, $not);
     }
 
-    public function orWhereExists(Closure $callback, bool $not = false)
+    public function orWhereExists(\Closure $callback, bool $not = false)
     {
         return $this->whereExists($callback, 'or', $not);
     }
 
-    public function whereNotExists(Closure $callback, $boolean = 'and')
+    public function whereNotExists(\Closure $callback, $boolean = 'and')
     {
         return $this->whereExists($callback, $boolean, true);
     }
 
-    public function orWhereNotExists(Closure $callback)
+    public function orWhereNotExists(\Closure $callback)
     {
         return $this->orWhereExists($callback, true);
     }
@@ -370,7 +385,7 @@ class Builder
         }
 
         if ($this->invalidOperatorAndValue($operator, $value)) {
-            throw new InvalidArgumentException('Illegal operator and value combination.');
+            throw new \InvalidArgumentException('Illegal operator and value combination.');
         }
 
         return [$value, $operator];
@@ -547,7 +562,7 @@ class Builder
         $direction = strtolower($direction);
 
         if (!in_array($direction, ['asc', 'desc'], true)) {
-            throw new InvalidArgumentException('Order direction must be "asc" or "desc".');
+            throw new \InvalidArgumentException('Order direction must be "asc" or "desc".');
         }
 
         $this->orders[] = [
@@ -592,7 +607,7 @@ class Builder
 
     public function union($query, $all = false)
     {
-        if ($query instanceof Closure) {
+        if ($query instanceof \Closure) {
             $query($query = $this->newQuery());
         }
 
@@ -847,7 +862,7 @@ class Builder
     public function addBinding($value, $type = 'where')
     {
         if (!array_key_exists($type, $this->bindings)) {
-            throw new InvalidArgumentException("Invalid binding type: {$type}.");
+            throw new \InvalidArgumentException("Invalid binding type: {$type}.");
         }
 
         if (is_array($value)) {
@@ -909,7 +924,7 @@ class Builder
 
     protected function createSub($query)
     {
-        if ($query instanceof Closure) {
+        if ($query instanceof \Closure) {
             $callback = $query;
 
             $callback($query = $this->forSubQuery());
@@ -933,8 +948,8 @@ class Builder
             return [$query, []];
         }
 
-        throw new InvalidArgumentException(
-            'A subquery must be a query builder instance, a Closure, or a string.'
+        throw new \InvalidArgumentException(
+            'A subquery must be a query builder instance, a \Closure, or a string.'
         );
     }
 
@@ -974,7 +989,7 @@ class Builder
     protected function isQueryable($value)
     {
         return $value instanceof self ||
-            $value instanceof Closure;
+            $value instanceof \Closure;
     }
 
     public function cloneWithoutBindings(array $except)
