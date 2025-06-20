@@ -199,8 +199,23 @@ class Builder
             func_num_args() === 2
         );
 
+        if ($column instanceof Closure && is_null($operator)) {
+            return $this->whereNested($column, $boolean);
+        }
+
+        if (!is_null($operator) && $this->isQueryable($column)) {
+            [$sub, $bindings] = $this->createSub($column);
+
+            return $this->addBinding($bindings)
+                ->where(new Expression('(' . $sub . ')'), $operator, $value, $boolean);
+        }
+
         if ($this->invalidOperator($operator)) {
             [$value, $operator] = [$operator, '='];
+        }
+
+        if ($value instanceof Closure) {
+            return $this->whereSub($column, $operator, $value, $boolean);
         }
 
         if (is_null($value)) {
@@ -208,6 +223,14 @@ class Builder
         }
 
         $type = 'Basic';
+
+        if (is_bool($value) && mb_strpos($column, '->') !== false) {
+            $value = new Expression($value ? 'true' : 'false');
+
+            if (is_string($column)) {
+                $type = 'JsonBoolean';
+            }
+        }
 
         if ($this->isBitwiseOperator($operator)) {
             $type = 'Bitwise';
@@ -221,7 +244,9 @@ class Builder
             'boolean'
         );
 
-        $this->addBinding($value);
+        if (!$value instanceof Expression) {
+            $this->addBinding($value);
+        }
 
         return $this;
     }
@@ -260,6 +285,56 @@ class Builder
 
             $this->addBinding($query->getRawBindings()['where']);
         }
+
+        return $this;
+    }
+
+    protected function whereSub($column, $operator, Closure $callback, $boolean)
+    {
+        $type = 'Sub';
+
+        $callback($query = $this->forSubQuery());
+
+        $this->wheres[] = compact(
+            'type', 'column', 'operator', 'query', 'boolean'
+        );
+
+        $this->addBinding($query->getBindings());
+
+        return $this;
+    }
+
+    public function whereExists(Closure $callback, $boolean = 'and', $not = false)
+    {
+        $query = $this->forSubQuery();
+
+        $callback($query);
+
+        return $this->addWhereExistsQuery($query, $boolean, $not);
+    }
+
+    public function orWhereExists(Closure $callback, bool $not = false)
+    {
+        return $this->whereExists($callback, 'or', $not);
+    }
+
+    public function whereNotExists(Closure $callback, $boolean = 'and')
+    {
+        return $this->whereExists($callback, $boolean, true);
+    }
+
+    public function orWhereNotExists(Closure $callback)
+    {
+        return $this->orWhereExists($callback, true);
+    }
+
+    public function addWhereExistsQuery(self $query, $boolean = 'and', $not = false)
+    {
+        $type = $not ? 'NotExists' : 'Exists';
+
+        $this->wheres[] = compact('type', 'query', 'boolean');
+
+        $this->addBinding($query->getBindings());
 
         return $this;
     }
@@ -348,9 +423,17 @@ class Builder
     {
         $type = $not ? 'NotIn' : 'In';
 
+        if ($this->isQueryable($values)) {
+            [$query, $bindings] = $this->createSub($values);
+
+            $values = [new Expression($query)];
+
+            $this->addBinding($bindings);
+        }
+
         $this->wheres[] = compact('type', 'column', 'values', 'boolean');
 
-        $this->addBinding($values);
+        $this->addBinding($this->cleanBindings($values));
 
         return $this;
     }
@@ -806,6 +889,13 @@ class Builder
         return $result;
     }
 
+    public function cleanBindings(array $bindings)
+    {
+        return array_filter($bindings, function ($val) {
+            return !$val instanceof Expression;
+        });
+    }
+
     public function selectRaw($expression, array $bindings = [])
     {
         $this->addSelect(new Expression($expression));
@@ -879,6 +969,12 @@ class Builder
     public function clone()
     {
         return clone $this;
+    }
+
+    protected function isQueryable($value)
+    {
+        return $value instanceof self ||
+            $value instanceof Closure;
     }
 
     public function cloneWithoutBindings(array $except)

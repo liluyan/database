@@ -16,6 +16,23 @@ use Apps\Helper\DiUtils;
 use GodJarvis\Database\Query\Builder;
 use GodJarvis\Database\Query\JoinClause;
 
+//子查询
+$builder = new Builder();
+$sql = $builder->from('pigeon_advertiser_list')
+    ->select(['media', 'advertiser_id'])
+    ->whereIn('id', function (Builder $query){
+        $query->from('pigeon_advertiser_list')
+            ->select(['id'])
+            ->whereIn('id', [216, 217]);
+    })
+    ->toSql();
+echo '子查询原始SQL：' . $sql . PHP_EOL;
+echo '子查询绑定参数：';
+var_dump($bindings = $builder->getBindings());
+echo '子查询完整SQL：' . $builder->toFullSql() . PHP_EOL;
+echo '查询结果：';
+var_dump(DiUtils::getDb()->fetchAll($sql, 2, $bindings));
+
 //连表查询
 $builder = new Builder();
 $sql = $builder->from('pigeon_advertiser_list as pal')
