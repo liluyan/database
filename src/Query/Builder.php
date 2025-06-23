@@ -677,7 +677,7 @@ class Builder
                 $bindValues = $this->prepareBindingsForUpsert($this->upsertValues['insert'], $this->upsertValues['update']);
                 break;
             case 'delete' === $this->operate:
-                $bindValues = $this->prepareBindingsForDelete($this->updateOrInsertValues);
+                $bindValues = $this->prepareBindingsForDelete($this->bindings);
                 break;
         }
         return $bindValues;
