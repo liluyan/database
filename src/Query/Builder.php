@@ -736,6 +736,13 @@ class Builder
 
     public function prepareBindingsForUpdate(array $bindings, array $values)
     {
+        $values = array_filter($values, function ($value, $column) {
+            return !($this->grammar->isJsonSelector($column) && is_bool($value));
+        }, ARRAY_FILTER_USE_BOTH);
+        $values = array_map(function ($value) {
+            return is_array($value) ? json_encode($value) : $value;
+        }, $values);
+
         $cleanBindings = $bindings;
         unset($cleanBindings['select'], $cleanBindings['join']);
 

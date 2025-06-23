@@ -26,11 +26,23 @@ class Grammar
 
     protected function whereNull(Builder $query, $where)
     {
+        if ($this->isJsonSelector($where['column'])) {
+            [$field, $path] = $this->wrapJsonFieldAndPath($where['column']);
+
+            return '(json_extract(' . $field . $path . ') is null OR json_type(json_extract(' . $field . $path . ')) = \'NULL\')';
+        }
+
         return $this->wrap($where['column']) . ' is null';
     }
 
     protected function whereNotNull(Builder $query, $where)
     {
+        if ($this->isJsonSelector($where['column'])) {
+            [$field, $path] = $this->wrapJsonFieldAndPath($where['column']);
+
+            return '(json_extract(' . $field . $path . ') is not null AND json_type(json_extract(' . $field . $path . ')) != \'NULL\')';
+        }
+
         return $this->wrap($where['column']) . ' is not null';
     }
 
@@ -142,7 +154,17 @@ class Grammar
 
     protected function compileDeleteWithoutJoins(Builder $query, $table, $where)
     {
-        return "delete from {$table} {$where}";
+        $sql = "delete from {$table} {$where}";
+
+        if (!empty($query->orders)) {
+            $sql .= ' ' . $this->compileOrders($query, $query->orders);
+        }
+
+        if (isset($query->limit)) {
+            $sql .= ' ' . $this->compileLimit($query, $query->limit);
+        }
+
+        return $sql;
     }
 
     protected function wrapValue($value)
@@ -635,6 +657,11 @@ class Grammar
         return '\'$."' . str_replace($delimiter, '"."', $value) . '"\'';
     }
 
+    public function isJsonSelector($value)
+    {
+        return mb_strpos($value, '->') !== false;
+    }
+
     protected function concatenate($segments)
     {
         return implode(' ', array_filter($segments, function ($value) {
@@ -850,5 +877,40 @@ class Grammar
         $columns = implode(', ', array_combine($keys, $items));
 
         return $sql . $columns;
+    }
+
+    protected function compileJsonUpdateColumn($key, $value)
+    {
+        if (is_bool($value)) {
+            $value = $value ? 'true' : 'false';
+        } elseif (is_array($value)) {
+            $value = 'cast(? as json)';
+        } else {
+            $value = $this->parameter($value);
+        }
+
+        [$field, $path] = $this->wrapJsonFieldAndPath($key);
+
+        return "{$field} = json_set({$field}{$path}, {$value})";
+    }
+
+    protected function wrapJsonSelector($value)
+    {
+        [$field, $path] = $this->wrapJsonFieldAndPath($value);
+
+        return 'json_unquote(json_extract(' . $field . $path . '))';
+    }
+
+    /**
+     * Wrap the given JSON selector for boolean values.
+     *
+     * @param string $value
+     * @return string
+     */
+    protected function wrapJsonBooleanSelector($value)
+    {
+        [$field, $path] = $this->wrapJsonFieldAndPath($value);
+
+        return 'json_extract(' . $field . $path . ')';
     }
 }
