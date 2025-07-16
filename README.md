@@ -1,11 +1,11 @@
 
 ## **安装**
 
-composer require godjarvis/database
+composer require liluyan/database
 
 ## **更新**
 
-composer update godjarvis/database
+composer update liluyan/database
 
 ## **使用**
 
@@ -13,8 +13,8 @@ composer update godjarvis/database
 <?php
 
 use Apps\Helper\DiUtils;
-use GodJarvis\Database\Query\Builder;
-use GodJarvis\Database\Query\JoinClause;
+use Liluyan\Database\Query\Builder;
+use Liluyan\Database\Query\JoinClause;
 
 //子查询
 $builder = new Builder();

@@ -1,6 +1,6 @@
 <?php
 
-namespace GodJarvis\Database\Query;
+namespace Liluyan\Database\Query;
 
 class JoinClause extends Builder
 {
